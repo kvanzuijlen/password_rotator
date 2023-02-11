@@ -1,9 +1,9 @@
+import collections.abc
 import dataclasses
-import random
 import secrets
 import string
 import typing
-from typing import Callable, Dict
+from typing import Callable
 
 if typing.TYPE_CHECKING:
     from password_rotator.model.secret import Secret
@@ -44,10 +44,10 @@ def generate_secure_passphrase(requirements: PassphraseRequirements) -> "Secret"
     if requirements.allow_uppercase:
         case = "random"
 
-    amount_numbers = random.randint(requirements.min_amount_numbers, requirements.max_amount_numbers)
-    amount_special_characters = random.randint(
-        requirements.min_amount_special_characters,
-        requirements.max_amount_special_characters,
+    amount_numbers = random_int(minimum=requirements.min_amount_numbers, maximum=requirements.max_amount_numbers)
+    amount_special_characters = random_int(
+        minimum=requirements.min_amount_special_characters,
+        maximum=requirements.max_amount_special_characters,
     )
 
     password = xkcd_password.generate_xkcdpassword(wordlist=wordlist, delimiter="-", case=case)
@@ -57,11 +57,11 @@ def generate_secure_passphrase(requirements: PassphraseRequirements) -> "Secret"
 
 
 def generate_secure_password(requirements: PasswordRequirements) -> "Secret":
-    amount_uppercase = random.randint(requirements.min_amount_uppercase, requirements.max_amount_uppercase)
-    amount_numbers = random.randint(requirements.min_amount_numbers, requirements.max_amount_numbers)
-    amount_special_characters = random.randint(
-        requirements.min_amount_special_characters,
-        requirements.max_amount_special_characters,
+    amount_uppercase = random_int(minimum=requirements.min_amount_uppercase, maximum=requirements.max_amount_uppercase)
+    amount_numbers = random_int(minimum=requirements.min_amount_numbers, maximum=requirements.max_amount_numbers)
+    amount_special_characters = random_int(
+        minimum=requirements.min_amount_special_characters,
+        maximum=requirements.max_amount_special_characters,
     )
     total_non_lower_characters = sum((amount_uppercase, amount_numbers, amount_special_characters))
     if sum((total_non_lower_characters, requirements.min_amount_lowercase)) > requirements.max_length:
@@ -79,7 +79,7 @@ def generate_secure_password(requirements: PasswordRequirements) -> "Secret":
         ))
     min_required_lowercase = max(requirements.min_amount_lowercase, requirements.min_length - total_non_lower_characters)
     max_possible_lowercase = max(requirements.min_amount_lowercase, requirements.max_length - total_non_lower_characters)
-    amount_lowercase = random.randint(min_required_lowercase, max_possible_lowercase)
+    amount_lowercase = random_int(minimum=min_required_lowercase, maximum=max_possible_lowercase)
 
     uppercase_letters = [secrets.choice(string.ascii_uppercase) for _ in range(amount_uppercase)]
     numbers = [secrets.choice(string.digits) for _ in range(amount_numbers)]
@@ -87,9 +87,11 @@ def generate_secure_password(requirements: PasswordRequirements) -> "Secret":
     lowercase_letters = [secrets.choice(string.ascii_lowercase) for _ in range(amount_lowercase)]
 
     password_characters = uppercase_letters + numbers + special_characters + lowercase_letters
-    random.shuffle(password_characters)
+    return Secret(shuffle(iterable="".join(password_characters)))
 
-    return Secret("".join(password_characters))
+
+def random_int(minimum: int, maximum: int) -> int:
+    return secrets.choice(range(start=minimum, stop=maximum))
 
 
 def supported_generators() -> dict[str, Callable[[PassphraseRequirements], "Secret"] | Callable[[PasswordRequirements], "Secret"]]:
@@ -97,3 +99,10 @@ def supported_generators() -> dict[str, Callable[[PassphraseRequirements], "Secr
         "passphrase": generate_secure_passphrase,
         "secret": generate_secure_password,
     }
+
+
+def shuffle(iterable: collections.abc.Sized) -> collections.abc.Sized:
+    for index in range(len(iterable) - 1, 0, -1):
+        swap_index = random_int(0, index + 1)
+        iterable[index], iterable[swap_index] = iterable[swap_index], iterable[index]
+    return iterable
